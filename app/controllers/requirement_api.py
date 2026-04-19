@@ -53,23 +53,89 @@ def create_requirement():
     return jsonify({'NodeID': new_id, 'HavuzKodu': new_node.get('HavuzKodu', '')}), 201
 
 
+# @requirement_api_bp.route('/ister_node/<int:node_id>', methods=['PUT'])
+# @login_required
+# def update_requirement(node_id):
+#     data = request.json
+#     model = RequirementModel(mysql)
+#     print(f"Updating NodeID {node_id} with data: {data}")  # Debug log
+#     cur = model.get_dict_cursor()
+#     cur.execute("SELECT * FROM ister_node WHERE NodeID=%s", (node_id,))
+#     old_node = cur.fetchone()
+#     cur.close()
+
+#     if not old_node:
+#         return jsonify({'error': 'İster bulunamadı'}), 404
+
+#     field_map = ['Icerik', 'TestYontemiID', 'NodeNumarasi', 'IsterTipi',
+#                  'HavuzKodu', 'KonfigID', 'SeviyeID', 'ParentID']
+#     updates = {f: data[f] for f in field_map if f in data}
+
+#     if updates:
+#         model.update(node_id, old_platform_id=old_node.get('PlatformID'), **updates)
+#         for field, new_val in updates.items():
+#             old_val = old_node.get(field)
+#             if str(old_val or '') != str(new_val or ''):
+#                 record_log('ister_node', node_id, field, old_val, new_val, LogType.UPDATE.value)
+
+#     return jsonify({'ok': True})
+
 @requirement_api_bp.route('/ister_node/<int:node_id>', methods=['PUT'])
 @login_required
 def update_requirement(node_id):
     data = request.json
     model = RequirementModel(mysql)
-
     cur = model.get_dict_cursor()
     cur.execute("SELECT * FROM ister_node WHERE NodeID=%s", (node_id,))
     old_node = cur.fetchone()
-    cur.close()
 
     if not old_node:
+        cur.close()
         return jsonify({'error': 'İster bulunamadı'}), 404
 
     field_map = ['Icerik', 'TestYontemiID', 'NodeNumarasi', 'IsterTipi',
                  'HavuzKodu', 'KonfigID', 'SeviyeID', 'ParentID']
     updates = {f: data[f] for f in field_map if f in data}
+
+    # HavuzKodu güncelleme: ilgili tüm node'lara yay
+    new_havuz_kodu = updates.get('HavuzKodu')
+    if new_havuz_kodu is not None and str(new_havuz_kodu).strip() != '':
+        havuz_node_id = old_node.get('HavuzNodeID')
+
+        if havuz_node_id:
+            # 1) HavuzNodeID = NodeID olan node'u güncelle (havuz ana node'u)
+            cur.execute(
+                "UPDATE ister_node SET HavuzKodu=%s WHERE NodeID=%s",
+                (new_havuz_kodu, havuz_node_id)
+            )
+            # Ana node için log
+            cur.execute("SELECT HavuzKodu FROM ister_node WHERE NodeID=%s", (havuz_node_id,))
+            ana_node = cur.fetchone()
+            if ana_node and str(ana_node.get('HavuzKodu') or '') != str(new_havuz_kodu):
+                record_log('ister_node', havuz_node_id, 'HavuzKodu',
+                           ana_node.get('HavuzKodu'), new_havuz_kodu, LogType.UPDATE.value)
+
+            # 2) Aynı HavuzNodeID'ye sahip tüm node'ları güncelle (mevcut node dahil)
+            cur.execute(
+                "UPDATE ister_node SET HavuzKodu=%s WHERE HavuzNodeID=%s",
+                (new_havuz_kodu, havuz_node_id)
+            )
+            # Etkilenen kardeş node'lar için log
+            cur.execute(
+                "SELECT NodeID, HavuzKodu FROM ister_node WHERE HavuzNodeID=%s",
+                (havuz_node_id,)
+            )
+            siblings = cur.fetchall()
+            for sibling in siblings:
+                if str(sibling.get('HavuzKodu') or '') != str(new_havuz_kodu):
+                    record_log('ister_node', sibling['NodeID'], 'HavuzKodu',
+                               sibling.get('HavuzKodu'), new_havuz_kodu, LogType.UPDATE.value)
+
+        # updates içindeki HavuzKodu zaten ana update'de işlenecek,
+        # tekrar işlenmemesi için çıkar
+        updates.pop('HavuzKodu', None)
+
+    cur.close()
 
     if updates:
         model.update(node_id, old_platform_id=old_node.get('PlatformID'), **updates)
@@ -79,7 +145,6 @@ def update_requirement(node_id):
                 record_log('ister_node', node_id, field, old_val, new_val, LogType.UPDATE.value)
 
     return jsonify({'ok': True})
-
 
 @requirement_api_bp.route('/ister_node/<int:node_id>', methods=['DELETE'])
 @login_required

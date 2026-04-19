@@ -178,11 +178,11 @@ def ister_seti_olustur(pid):
 
         cur2.execute("""INSERT INTO ister_node
                         (PlatformID, SeviyeID, ParentID, HavuzNodeID, KonfigID,
-                         NodeNumarasi, Icerik, TestYontemiID, OlusturanID)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                         NodeNumarasi, Icerik, TestYontemiID, OlusturanID,HavuzKodu)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                      (pid, yeni_seviye_id, yeni_parent, hn['NodeID'], hn['KonfigID'],
                       hn.get('NodeNumarasi', ''), hn['Icerik'], hn['TestYontemiID'],
-                      flask_session.get('kullanici_id')))
+                      flask_session.get('kullanici_id'), hn.get('HavuzKodu', '')))
         mysql.connection.commit()
         id_map[hn['NodeID']] = cur2.lastrowid
 

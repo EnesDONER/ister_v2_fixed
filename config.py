@@ -21,7 +21,7 @@ class Config:
     # MySQL — Lokal veritabanı ayarları
     MYSQL_HOST     = os.environ.get('MYSQL_HOST')     or 'localhost'
     MYSQL_USER     = os.environ.get('MYSQL_USER')     or 'root'
-    MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD') or 'Rz123456.'
+    MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD') or '1234'
     MYSQL_DB       = os.environ.get('MYSQL_DB')       or 'ister_v2'
     MYSQL_CHARSET  = 'utf8mb4'
 

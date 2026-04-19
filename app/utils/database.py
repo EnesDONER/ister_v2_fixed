@@ -16,10 +16,10 @@ def init_db(app):
         app: Flask uygulaması
     """
     # MySQL konfigürasyonunu app'e ekle
-    app.config['MYSQL_HOST'] = app.config.get('MYSQL_HOST', 'sql7.freesqldatabase.com')
-    app.config['MYSQL_USER'] = app.config.get('MYSQL_USER', 'sql7821740')
-    app.config['MYSQL_PASSWORD'] = app.config.get('MYSQL_PASSWORD', 'Wsl8FFMh9p')
-    app.config['MYSQL_DB'] = app.config.get('MYSQL_DB', 'sql7821740')
+    app.config['MYSQL_HOST'] = app.config.get('MYSQL_HOST', 'localhost')
+    app.config['MYSQL_USER'] = app.config.get('MYSQL_USER', 'root')
+    app.config['MYSQL_PASSWORD'] = app.config.get('MYSQL_PASSWORD', '1234')
+    app.config['MYSQL_DB'] = app.config.get('MYSQL_DB', 'ister_v2')
     app.config['MYSQL_CHARSET'] = app.config.get('MYSQL_CHARSET', 'utf8mb4')
     
     # MySQL'i uygulamayla bağla
