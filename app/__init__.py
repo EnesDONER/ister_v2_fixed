@@ -2,7 +2,7 @@
 Flask Uygulaması Başlatma
 İster Yönetimi v2 - MVC Mimarisi
 """
-from flask import Flask
+from flask import Flask, app
 from config import get_config
 from app.utils.database import init_db, mysql
 
@@ -60,6 +60,11 @@ def _register_blueprints(app):
     from app.controllers.dashboard_api import dashboard_api_bp
     from app.controllers.comparison_api import comparison_api_bp
     
+    from app.controllers.user_api       import user_api_bp
+    from app.controllers.audit_log_api  import audit_log_api_bp
+    from app.controllers.tablo_api      import tablo_api_bp
+    from app.controllers.bullet_api     import bullet_api_bp
+
     # Sayfa yönlendiricileri
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
@@ -73,6 +78,11 @@ def _register_blueprints(app):
     app.register_blueprint(ta_api_bp)
     app.register_blueprint(dashboard_api_bp)
     app.register_blueprint(comparison_api_bp)
+
+    app.register_blueprint(user_api_bp)
+    app.register_blueprint(audit_log_api_bp)
+    app.register_blueprint(tablo_api_bp)
+    app.register_blueprint(bullet_api_bp)
 
 
 def _register_error_handlers(app):
