@@ -16,14 +16,53 @@ dashboard_api_bp = Blueprint('dashboard_api', __name__, url_prefix='/api')
 def get_dashboard():
     """Dashboard özet verilerini döndür"""
     model = DashboardModel(mysql)
-    return jsonify(model.get_summary())
+    platformlar = model.get_summary()
+
+    # get_summary() düz liste dönüyor — JS'in beklediği obje formatına wrap et
+    if isinstance(platformlar, list):
+        plat_say   = len(platformlar)
+        tgd_toplam = sum(p.get('TGDSayi', 0) for p in platformlar)
+        bas_toplam = sum(p.get('BasariliTest', 0) for p in platformlar)
+        hat_toplam = sum(p.get('HataliTest', 0) for p in platformlar)
+        top_test   = sum(p.get('ToplamTest', 0) for p in platformlar)
+        basari_orani = round(bas_toplam / top_test * 100) if top_test else 0
+
+        return jsonify({
+            'platform_sayisi': plat_say,
+            'tgd_toplam':      tgd_toplam,
+            'basari_orani':    basari_orani,
+            'hatali_test':     hat_toplam,
+            'platformlar':     platformlar,
+        })
+
+    # Zaten obje dönüyorsa olduğu gibi geç
+    return jsonify(platformlar)
 
 
 @dashboard_api_bp.route('/export/dashboard', methods=['GET'])
 @login_required
 def export_dashboard():
+    """Dashboard verilerini export için döndür (dashboard ile aynı format)"""
     model = DashboardModel(mysql)
-    return jsonify(model.get_summary())
+    platformlar = model.get_summary()
+
+    if isinstance(platformlar, list):
+        plat_say   = len(platformlar)
+        tgd_toplam = sum(p.get('TGDSayi', 0) for p in platformlar)
+        bas_toplam = sum(p.get('BasariliTest', 0) for p in platformlar)
+        hat_toplam = sum(p.get('HataliTest', 0) for p in platformlar)
+        top_test   = sum(p.get('ToplamTest', 0) for p in platformlar)
+        basari_orani = round(bas_toplam / top_test * 100) if top_test else 0
+
+        return jsonify({
+            'platform_sayisi': plat_say,
+            'tgd_toplam':      tgd_toplam,
+            'basari_orani':    basari_orani,
+            'hatali_test':     hat_toplam,
+            'platformlar':     platformlar,
+        })
+
+    return jsonify(platformlar)
 
 
 @dashboard_api_bp.route('/platform/<int:platform_id>/traceability', methods=['GET'])
@@ -37,25 +76,17 @@ def get_traceability(platform_id):
 @login_required
 def get_comparison_report():
     """Havuz isterlerini tüm platformlardaki karşılıklarıyla döndür"""
-    platform_model   = PlatformModel(mysql)
+    platform_model    = PlatformModel(mysql)
     requirement_model = RequirementModel(mysql)
 
     pool_platform = platform_model.get_pool_platform()
     if not pool_platform:
         return jsonify({'error': 'Havuz platformu bulunamadı'}), 404
 
-    all_platforms     = platform_model.get_all()
+    all_platforms      = platform_model.get_all()
     non_pool_platforms = [p for p in all_platforms if not p.get('HavuzMu')]
 
-    # Havuz isterlerini getir (SiraNo sırasıyla, parent bilgisi dahil)
     pool_requirements = requirement_model.get_tree(pool_platform['PlatformID'])
-
-    # HATA #4 DÜZELTMESİ: Hiyerarşiyi koru — başlık sonra alt gereksinimler
-    # get_tree() zaten "ParentID IS NULL DESC, SiraNo, NodeID" ile sıralıyor.
-    # Düz listeyi hiyerarşik sırada yeniden düzenle:
-    # 1) önce kök node'ları (ParentID=None) SiraNo'ya göre
-    # 2) her kökün altına çocuklarını SiraNo'ya göre, özyinelemeli
-    node_map = {n['NodeID']: n for n in pool_requirements}
 
     def build_ordered(parent_id=None):
         children = sorted(
@@ -70,16 +101,12 @@ def get_comparison_report():
 
     ordered_pool = build_ordered(None)
 
-    # Platform isterlerini getir ve havuz koduna göre map oluştur
     platform_map = {}
-
     for platform in non_pool_platforms:
         platform_reqs = requirement_model.get_tree(platform['PlatformID'])
         pid_str = str(platform['PlatformID'])
-
         for req in platform_reqs:
             code = req.get('HavuzKodu')
-            # HATA #5 DÜZELTMESİ: Başlıkları (IsterTipi='B') plat_map'e ekleme
             if code and req.get('IsterTipi') != 'B':
                 if code not in platform_map:
                     platform_map[code] = {}
@@ -91,7 +118,7 @@ def get_comparison_report():
 
     return jsonify({
         'platformlar':    non_pool_platforms,
-        'havuz_isterler': ordered_pool,   # hiyerarşik sıralı liste
+        'havuz_isterler': ordered_pool,
         'plat_map':       platform_map
     })
 
@@ -119,11 +146,9 @@ def get_company_reviews():
 
     cur.execute(query, params)
     data = cur.fetchall()
-
     for row in data:
         if row.get('OlusturmaTarihi'):
             row['OlusturmaTarihi'] = row['OlusturmaTarihi'].strftime('%d.%m.%Y %H:%M')
-
     cur.close()
     return jsonify(data)
 
