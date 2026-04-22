@@ -2,8 +2,10 @@
 Veritabanı Bağlantısı ve İşlemleri
 SQLite backend — MySQL arayüzüyle uyumlu
 """
-import sqlite3
 import re
+import sqlite3
+from datetime import datetime
+
 from flask import g, current_app
 
 
@@ -24,6 +26,37 @@ def _adapt(query: str) -> str:
         query, flags=re.IGNORECASE
     )
     return query
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Datetime dönüştürücü
+# SQLite DATETIME sütunları string döner — MySQL gibi datetime nesnesi yapalım
+# ─────────────────────────────────────────────────────────────────────────────
+
+_DT_PATTERNS = [
+    '%Y-%m-%d %H:%M:%S.%f',
+    '%Y-%m-%d %H:%M:%S',
+    '%Y-%m-%d',
+]
+
+def _parse_datetime(value):
+    """SQLite'ın döndürdüğü datetime string'ini datetime nesnesine çevir."""
+    if not isinstance(value, str):
+        return value
+    # Hızlı ön kontrol: tarih formatına benzemiyor mu?
+    if not re.match(r'^\d{4}-\d{2}-\d{2}', value):
+        return value
+    for fmt in _DT_PATTERNS:
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return value  # parse edilemezse orijinali döndür
+
+
+def _coerce_row(row: dict) -> dict:
+    """Satırdaki tüm değerleri datetime parse'dan geçir."""
+    return {k: _parse_datetime(v) for k, v in row.items()}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -51,13 +84,14 @@ class _CursorWrapper:
         row = self._cur.fetchone()
         if row is None:
             return None
-        return dict(row) if hasattr(row, 'keys') else row
+        d = dict(row) if hasattr(row, 'keys') else row
+        return _coerce_row(d)
 
     def fetchall(self):
         rows = self._cur.fetchall()
         if not rows:
             return []
-        return [dict(r) if hasattr(r, 'keys') else r for r in rows]
+        return [_coerce_row(dict(r) if hasattr(r, 'keys') else r) for r in rows]
 
     @property
     def lastrowid(self):
@@ -184,7 +218,8 @@ def commit_db():
 try:
     import MySQLdb as _real_mysqldb  # noqa: F401
 except ImportError:
-    import types as _types, sys as _sys
+    import types as _types
+    import sys as _sys
 
     _mod = _types.ModuleType('MySQLdb')
     _cur_mod = _types.ModuleType('MySQLdb.cursors')
